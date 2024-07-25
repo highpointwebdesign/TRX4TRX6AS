@@ -17,6 +17,7 @@ Goals;
 * buy basic esc
 * buy tx/rx
 * win the lottery
+* spell check this shit
 
 Completed:
 * setup reoo
