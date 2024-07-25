@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Savage Cat Racing Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .section { margin-bottom: 40px; }
+    .section h2 { border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 5px; }
+    .form-group input[type="number"], .form-group input[type="text"] {
+      text-align: center;
+    }
+    .form-group input[type="text"] {
+      width: 200px; /* Adjust width to fit IP addresses */
+    }
+    .button-group { display: flex; justify-content: space-between; align-items: center; }
+    .flash-success { background-color: #d4edda; }
+    .flash-error { background-color: #f8d7da; }
+  </style>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Savage Cat Racing Dashboard</h1>
+    <div class="section" id="vehicleSettings">
+      <h2>Vehicle Settings</h2>
+      <form id="vehicleForm"></form>
+    </div>
+    <div class="section" id="adminSettings">
+      <h2>Admin Settings</h2>
+      <form id="adminForm"></form>
+    </div>
+  </div>
+  <script>
+    $(document).ready(function() {
+      updateMessage('Retrieving data. Please wait...', 'info');
+
+      $.getJSON('http://192.168.87.30/data', function(data) {
+        const adminForm = $('#adminForm');
+        const vehicleForm = $('#vehicleForm');
+        
+        $.each(data, function(key, value) {
+          const formGroup = $('<div class="form-group"></div>');
+          formGroup.append('<label for="' + key + '">' + key.replace(/^(vs_|adm_)/, '').replace(/([A-Z])/g, ' $1').trim() + '</label>');
+          
+          const buttonGroup = $('<div class="button-group"></div>');
+          
+          if (key.startsWith('adm_')) {
+            buttonGroup.append('<input type="text" id="' + key + '" name="' + key + '" value="' + value + '" data-initial-value="' + value + '" onblur="updateSetting(\'' + key + '\')">');
+            formGroup.append(buttonGroup);
+            adminForm.append(formGroup);
+          } else if (key.startsWith('vs_')) {
+            buttonGroup.append('<button type="button" onclick="changeValue(\'' + key + '\', -0.1)">-</button>');
+            buttonGroup.append('<input type="number" id="' + key + '" name="' + key + '" value="' + value + '" readonly>');
+            buttonGroup.append('<button type="button" onclick="changeValue(\'' + key + '\', 0.1)">+</button>');
+            formGroup.append(buttonGroup);
+            vehicleForm.append(formGroup);
+          }
+        });
+
+        updateMessage('Data loaded successfully.', 'success');
+      }).fail(function() {
+        updateMessage('Data failed to load.', 'error');
+      });
+    });
+
+    function changeValue(setting, delta) {
+      const input = $('#' + setting);
+      const newValue = (parseFloat(input.val()) + delta).toFixed(1);
+      input.val(newValue);
+
+      const minusButton = input.prev('button');
+      const plusButton = input.next('button');
+
+      minusButton.prop('disabled', true);
+      plusButton.prop('disabled', true);
+
+      $.post('http://192.168.87.30/update', { value: setting + '=' + newValue })
+        .done(function() {
+          flashInput(input, 'flash-success', 1);
+          minusButton.prop('disabled', false);
+          plusButton.prop('disabled', false);
+        })
+        .fail(function() {
+          flashInput(input, 'flash-error', 3);
+          minusButton.prop('disabled', false);
+          plusButton.prop('disabled', false);
+        });
+    }
+
+    function updateSetting(setting) {
+      const input = $('#' + setting);
+      const newValue = input.val();
+      const initialValue = input.data('initial-value');
+
+      if (newValue !== initialValue) {
+        $.post('http://192.168.87.30/update', { value: setting + '=' + newValue })
+          .done(function() {
+            flashInput(input, 'flash-success', 1);
+            input.data('initial-value', newValue); // Update initial value to new value
+          })
+          .fail(function() {
+            flashInput(input, 'flash-error', 3);
+          });
+      }
+    }
+
+    function flashInput(input, className, times) {
+      for (let i = 0; i < times; i++) {
+        setTimeout(() => { input.addClass(className); }, i * 200);
+        setTimeout(() => { input.removeClass(className); }, i * 200 + 100);
+      }
+    }
+
+    function updateMessage(message, type) {
+      const messageElement = $('#message');
+      messageElement.removeClass('info error success').addClass(type).text(message);
+    }
+  </script>
+</body>
+</html>
